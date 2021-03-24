@@ -161,7 +161,7 @@ absl::Status InferenceContext::InitFromGraph(
   CopyInAndOutIds(graph);
   RETURN_IF_ERROR(ConvertOperations(creation_context.GetGpuInfo(), graph,
                                     create_info.hints));
-  RETURN_IF_ERROR(Merge());
+  RETURN_IF_ERROR(Merge(graph));
   RETURN_IF_ERROR(AllocateMemory(creation_context.context));
   BindMemoryToOperations();
   RETURN_IF_ERROR(Compile(creation_context));
@@ -404,7 +404,7 @@ absl::Status InferenceContext::ConvertOperations(const GpuInfo& gpu_info,
   return absl::OkStatus();
 }
 
-absl::Status InferenceContext::Merge() {
+absl::Status InferenceContext::Merge(const GraphFloat32& graph) {
   absl::flat_hash_set<ValueId> ready_tensors;
   for (const auto& input_id : input_ids_) {
     ready_tensors.insert(input_id);
@@ -414,7 +414,7 @@ absl::Status InferenceContext::Merge() {
     for (const auto& out_id : node.outputs) {
       ready_tensors.insert(out_id);
     }
-    if (node.outputs.size() != 1) {
+    if (node.outputs.size() != 1 || graph.IsGraphOutput(node.outputs[0])) {
       continue;
     }
     std::vector<int> next_nodes;
@@ -433,6 +433,7 @@ absl::Status InferenceContext::Merge() {
     auto& linkable_node = nodes_[next_nodes[0]];
     if (!linkable_node.cl_operation.GetGpuOperation().IsLinkable() ||
         linkable_node.outputs.size() != 1 ||
+	      graph.IsGraphOutput(linkable_node.outputs[0]) ||
         !IsReady(ready_tensors, linkable_node)) {
       continue;
     }

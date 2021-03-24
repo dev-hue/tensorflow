@@ -2578,12 +2578,19 @@ TfLiteIntArray* GetOpsToReplace(TfLiteContext* context, bool allow_quant_ops,
 absl::Status PrecreateIOTensors(
     TfLiteContext* context, GraphFloat32* graph, const std::vector<int>& io_ids,
     absl::flat_hash_map<int, int>* quant_conversion_map,
-    absl::flat_hash_map<int, Value*>* tensor_to_value) {
+    absl::flat_hash_map<int, Value*>* tensor_to_value, bool is_input) {
   for (const auto& id : io_ids) {
     const TfLiteTensor& tflite_tensor = context->tensors[id];
     if (tflite::IsConstantTensor(&tflite_tensor)) continue;
     RETURN_IF_ERROR(ObjectReader::ReadNonConstantTensor(
         context, tensor_to_value, quant_conversion_map, graph, id));
+
+    if (is_input) {
+      RETURN_IF_ERROR(graph->AddGraphInput((*tensor_to_value)[id]->id));
+    }
+    else {
+      RETURN_IF_ERROR(graph->AddGraphOutput((*tensor_to_value)[id]->id));
+    }
   }
   return absl::OkStatus();
 }
@@ -2675,9 +2682,9 @@ absl::Status BuildModelEnforceIO(
   std::vector<ValueId> variable_inputs_to_value_id;
 
   RETURN_IF_ERROR(PrecreateIOTensors(context, graph, input_ids,
-                                     quant_conversion_map, &tensor_to_value));
+                                     quant_conversion_map, &tensor_to_value, true));
   RETURN_IF_ERROR(PrecreateIOTensors(context, graph, output_ids,
-                                     quant_conversion_map, &tensor_to_value));
+                                     quant_conversion_map, &tensor_to_value, false));
   for (int i = 0; i < operations.size(); ++i) {
     TfLiteNode* tflite_node;
     TfLiteRegistration* registration;

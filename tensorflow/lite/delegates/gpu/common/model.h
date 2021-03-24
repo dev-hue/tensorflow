@@ -103,6 +103,10 @@ class GraphFloat32 {
 
   bool IsGraphOutput(ValueId id) const;
 
+  absl::Status AddGraphInput(ValueId id);
+  
+  absl::Status AddGraphOutput(ValueId id);
+
   // @return producer of the given value. Returns nullptr for deleted value.
   Node* FindProducer(ValueId id) const;
 
@@ -181,7 +185,9 @@ class GraphFloat32 {
 
   template <typename T>
   static void Erase(std::vector<T>* values, T value) {
-    values->erase(std::find(values->begin(), values->end(), value));
+    auto it = std::find(values->begin(), values->end(), value);
+    if (it != values->end())
+      values->erase(it);
   }
 
   // @return non-nullptr NodeDef that has valid Node or an error
@@ -219,6 +225,9 @@ class GraphFloat32 {
   // unique_ptr and store it in values_ and nodes_ or store it by value.
   // We store it by value here to make introspection calls cheaper.
   std::vector<ValueDef> values_;
+
+  std::vector<ValueId> input_values_;
+  std::vector<ValueId> output_values_;
 
   std::map<NodeId, NodeDef> nodes_;
   // Node Ids in order of execution.

@@ -43,7 +43,7 @@ std::vector<Value*> GraphFloat32::values() const {
 }
 
 std::vector<Value*> GraphFloat32::inputs() const {
-  return FilterValues([](const ValueDef& v) { return v.producer == nullptr; });
+  return FilterValues([&](const ValueDef& v) { return IsGraphInput(v.value->id); });
 }
 
 std::vector<Value*> GraphFloat32::variable_inputs() const {
@@ -52,7 +52,7 @@ std::vector<Value*> GraphFloat32::variable_inputs() const {
 }
 
 std::vector<Value*> GraphFloat32::outputs() const {
-  return FilterValues([](const ValueDef& v) { return v.consumers.empty(); });
+  return FilterValues([&](const ValueDef& v) { return IsGraphOutput(v.value->id); });
 }
 
 std::vector<Value*> GraphFloat32::FindInputs(NodeId id) const {
@@ -73,15 +73,43 @@ bool GraphFloat32::IsGraphInput(ValueId id) const {
   if (id >= values_.size()) {
     return false;
   }
-  return values_[id].producer == nullptr;
+  return std::find(input_values_.begin(), input_values_.end(), id) != input_values_.end();
 }
 
 bool GraphFloat32::IsGraphOutput(ValueId id) const {
   if (id >= values_.size()) {
     return false;
   }
-  return values_[id].consumers.empty();
+  return std::find(output_values_.begin(), output_values_.end(), id) != output_values_.end();
 }
+
+absl::Status GraphFloat32::AddGraphInput(ValueId id) {
+  if (id >= values_.size()) {
+    return absl::OutOfRangeError("ValueId is out of range");
+  }
+
+  if (IsGraphInput(id)) {
+    return absl::AlreadyExistsError(absl::StrCat(
+        "ValueId ", id, " is already a input of the graph"));
+  }
+
+  input_values_.push_back(id); 
+  return absl::OkStatus();
+};
+  
+absl::Status GraphFloat32::AddGraphOutput(ValueId id) {
+  if (id >= values_.size()) {
+    return absl::OutOfRangeError("ValueId is out of range");
+  }
+
+  if (IsGraphOutput(id)) {
+    return absl::AlreadyExistsError(absl::StrCat(
+        "ValueId ", id, " is already a output of the graph"));
+  }
+
+  output_values_.push_back(id);
+  return absl::OkStatus();
+};
 
 Node* GraphFloat32::FindProducer(ValueId id) const {
   if (id >= values_.size()) {
@@ -174,6 +202,9 @@ absl::Status GraphFloat32::SetProducer(NodeId producer, ValueId value) {
   if (v->producer != nullptr) {
     // value is no longer produced by it's previous producer.
     Erase(&nodes_[v->producer->id].outputs, value_ptr);
+  } else {
+    // value is no longer graph's input.
+    Erase(&input_values_, value);
   }
   v->producer = node_ptr;
   n->outputs.push_back(value_ptr);
@@ -189,6 +220,8 @@ absl::Status GraphFloat32::RemoveProducer(ValueId value) {
   }
   Erase(&nodes_[v->producer->id].outputs, value_ptr);
   v->producer = nullptr;
+  // Producer-less means input of graph.
+  AddGraphInput(value);
   return absl::OkStatus();
 }
 
@@ -209,6 +242,12 @@ absl::Status GraphFloat32::AddConsumer(NodeId consumer, ValueId value) {
   if (IsInput(consumer, value)) {
     return absl::AlreadyExistsError(absl::StrCat(
         "Node ", consumer, " is already a consumer of the value ", value));
+  }
+
+  
+  if (v->consumers.empty()) {
+    // value is no longer graph's output.
+    Erase(&output_values_, value);
   }
 
   n->inputs.push_back(value_ptr);
@@ -250,8 +289,15 @@ absl::Status GraphFloat32::ReplaceInput(NodeId node, ValueId old_value,
       break;
     }
   }
+
+  if (v_new->consumers.empty()) {
+    Erase(&output_values_, new_value);
+  }
   v_new->consumers.push_back(node_ptr);
   Erase(&v_old->consumers, node_ptr);
+  if (v_old->consumers.empty()) {
+    AddGraphOutput(old_value);
+  }
   return absl::OkStatus();
 }
 
@@ -267,6 +313,9 @@ absl::Status GraphFloat32::RemoveConsumer(NodeId consumer, ValueId value) {
   }
   Erase(&n->inputs, value_ptr);
   Erase(&v->consumers, node_ptr);
+  if (v->consumers.empty()) {
+    AddGraphOutput(value);
+  }
   return absl::OkStatus();
 }
 
@@ -276,9 +325,13 @@ absl::Status GraphFloat32::DeleteNode(NodeId id) {
   Node* node_ptr = n->node.get();
   for (auto value : n->inputs) {
     Erase(&values_[value->id].consumers, node_ptr);
+    if (values_[value->id].consumers.empty()) {
+      AddGraphOutput(value->id);
+    }
   }
   for (auto value : n->outputs) {
     values_[value->id].producer = nullptr;
+    AddGraphInput(value->id);
   }
   n->inputs.clear();
   n->outputs.clear();
@@ -292,11 +345,15 @@ absl::Status GraphFloat32::DeleteValue(ValueId id) {
   Value* value_ptr = v->value.get();
   if (v->producer != nullptr) {
     Erase(&nodes_[v->producer->id].outputs, value_ptr);
+  } else {
+    Erase(&input_values_, id);
   }
   if (!v->consumers.empty()) {
     for (auto node : v->consumers) {
       Erase(&nodes_[node->id].inputs, value_ptr);
     }
+  } else {
+    Erase(&output_values_, id);
   }
   v->producer = nullptr;
   v->consumers.clear();
