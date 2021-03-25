@@ -43,7 +43,8 @@ std::vector<Value*> GraphFloat32::values() const {
 }
 
 std::vector<Value*> GraphFloat32::inputs() const {
-  return FilterValues([](const ValueDef& v) { return v.producer == nullptr; });
+  return FilterValues(
+      [&](const ValueDef& v) { return IsGraphInput(v.value->id); });
 }
 
 std::vector<Value*> GraphFloat32::variable_inputs() const {
@@ -52,7 +53,8 @@ std::vector<Value*> GraphFloat32::variable_inputs() const {
 }
 
 std::vector<Value*> GraphFloat32::outputs() const {
-  return FilterValues([](const ValueDef& v) { return v.consumers.empty(); });
+  return FilterValues(
+      [&](const ValueDef& v) { return IsGraphOutput(v.value->id); });
 }
 
 std::vector<Value*> GraphFloat32::FindInputs(NodeId id) const {
@@ -73,14 +75,16 @@ bool GraphFloat32::IsGraphInput(ValueId id) const {
   if (id >= values_.size()) {
     return false;
   }
-  return values_[id].producer == nullptr;
+  return std::find(input_values_.begin(), input_values_.end(), id) !=
+         input_values_.end();
 }
 
 bool GraphFloat32::IsGraphOutput(ValueId id) const {
   if (id >= values_.size()) {
     return false;
   }
-  return values_[id].consumers.empty();
+  return std::find(output_values_.begin(), output_values_.end(), id) !=
+         output_values_.end();
 }
 
 Node* GraphFloat32::FindProducer(ValueId id) const {

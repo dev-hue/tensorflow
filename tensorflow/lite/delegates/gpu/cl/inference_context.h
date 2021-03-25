@@ -117,7 +117,7 @@ class InferenceContext {
   absl::Status ReserveGraphTensors(const CreateInferenceInfo& create_info,
                                    const GpuInfo& gpu_info,
                                    const GraphFloat32& graph);
-  absl::Status Merge();
+  absl::Status Merge(const GraphFloat32& graph);
   absl::Status AllocateMemory(CLContext* context);
 
   absl::Status AllocateMemoryForConstTensors(CLContext* context);
