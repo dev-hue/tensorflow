@@ -32,6 +32,8 @@ TEST(Model, SingleNode) {
   Node* node = graph.NewNode();
   Value* graph_input = graph.NewValue();
   Value* graph_output = graph.NewValue();
+  graph.AddGraphInput(graph_input->id);
+  graph.AddGraphOutput(graph_output->id);
   ASSERT_TRUE(graph.AddConsumer(node->id, graph_input->id).ok());
   ASSERT_TRUE(graph.SetProducer(node->id, graph_output->id).ok());
 
@@ -54,6 +56,9 @@ TEST(Model, SingleNodeMultipleOutputs) {
   Value* graph_input = graph.NewValue();
   Value* graph_output1 = graph.NewValue();
   Value* graph_output2 = graph.NewValue();
+  graph.AddGraphInput(graph_input->id);
+  graph.AddGraphOutput(graph_output1->id);
+  graph.AddGraphOutput(graph_output2->id);
   ASSERT_TRUE(graph.AddConsumer(node->id, graph_input->id).ok());
   ASSERT_TRUE(graph.SetProducer(node->id, graph_output1->id).ok());
   ASSERT_TRUE(graph.SetProducer(node->id, graph_output2->id).ok());
@@ -67,6 +72,7 @@ TEST(Model, SetSameConsumer) {
   GraphFloat32 graph;
   Node* node = graph.NewNode();
   Value* graph_input = graph.NewValue();
+  graph.AddGraphInput(graph_input->id);
   ASSERT_TRUE(graph.AddConsumer(node->id, graph_input->id).ok());
   EXPECT_FALSE(graph.AddConsumer(node->id, graph_input->id).ok());
 }
@@ -77,6 +83,10 @@ TEST(Model, RemoveConsumer) {
   Node* node = graph.NewNode();
   Value* graph_input1 = graph.NewValue();
   Value* graph_input2 = graph.NewValue();
+
+  graph.AddGraphInput(graph_input1->id);
+  graph.AddGraphInput(graph_input2->id);
+
   ASSERT_TRUE(graph.AddConsumer(node->id, graph_input1->id).ok());
   ASSERT_TRUE(graph.AddConsumer(node->id, graph_input2->id).ok());
   EXPECT_THAT(graph.FindConsumers(graph_input1->id),
@@ -101,6 +111,7 @@ TEST(Model, SetSameProducer) {
   GraphFloat32 graph;
   Node* node = graph.NewNode();
   Value* graph_output = graph.NewValue();
+  graph.AddGraphOutput(graph_output->id);
   ASSERT_TRUE(graph.SetProducer(node->id, graph_output->id).ok());
   EXPECT_FALSE(graph.SetProducer(node->id, graph_output->id).ok());
 }
@@ -125,6 +136,7 @@ TEST(Model, RemoveProducer) {
   Node* node = graph.NewNode();
   Value* graph_output = graph.NewValue();
 
+  graph.AddGraphOutput(graph_output->id);
   ASSERT_TRUE(graph.SetProducer(node->id, graph_output->id).ok());
   EXPECT_THAT(graph.inputs(), UnorderedElementsAre());
   EXPECT_THAT(graph.FindProducer(graph_output->id), ::testing::Eq(node));
@@ -143,6 +155,8 @@ class OneNodeModel : public testing::Test {
     node_ = graph_.NewNode();
     Value* graph_input = graph_.NewValue();
     Value* graph_output = graph_.NewValue();
+    graph_.AddGraphInput(graph_input->id);
+    graph_.AddGraphOutput(graph_output->id);
     ASSERT_TRUE(graph_.AddConsumer(node_->id, graph_input->id).ok());
     ASSERT_TRUE(graph_.SetProducer(node_->id, graph_output->id).ok());
     EXPECT_THAT(graph_.inputs(), UnorderedElementsAre(graph_input));
@@ -176,6 +190,8 @@ class TwoNodesModel : public testing::Test {
     second_node_ = graph_.NewNode();
     graph_output_ = graph_.NewValue();
 
+    graph_.AddGraphInput(graph_input_->id);
+    graph_.AddGraphOutput(graph_output_->id);
     ASSERT_TRUE(graph_.AddConsumer(first_node_->id, graph_input_->id).ok());
     ASSERT_TRUE(graph_.SetProducer(first_node_->id, value_->id).ok());
     ASSERT_TRUE(graph_.AddConsumer(second_node_->id, value_->id).ok());
@@ -231,6 +247,8 @@ class ThreeNodesModel : public testing::Test {
     value1_ = graph_.NewValue();
     graph_output_ = graph_.NewValue();
 
+    graph_.AddGraphInput(graph_input_->id);
+    graph_.AddGraphOutput(graph_output_->id);
     ASSERT_TRUE(graph_.AddConsumer(first_node_->id, graph_input_->id).ok());
     ASSERT_TRUE(graph_.SetProducer(first_node_->id, value0_->id).ok());
     ASSERT_TRUE(graph_.AddConsumer(second_node_->id, value0_->id).ok());
@@ -304,6 +322,12 @@ TEST(Model, RemoveSimpleNodeKeepInputComplexCase) {
   Value* o1 = graph.NewValue();
   Value* o2 = graph.NewValue();
 
+  graph.AddGraphInput(v0->id);
+  graph.AddGraphInput(v1->id);
+  graph.AddGraphInput(v3->id);
+  graph.AddGraphOutput(o1->id);
+  graph.AddGraphOutput(o2->id);
+
   ASSERT_TRUE(graph.AddConsumer(n0->id, v0->id).ok());
   ASSERT_TRUE(graph.AddConsumer(n0->id, v1->id).ok());
   ASSERT_TRUE(graph.SetProducer(n0->id, o1->id).ok());
@@ -355,6 +379,10 @@ TEST(Model, ReassignValue) {
   Node* node2 = graph.NewNode();
   Value* graph_input = graph.NewValue();
   Value* graph_output = graph.NewValue();
+
+  graph.AddGraphInput(graph_input->id);
+  graph.AddGraphOutput(graph_output->id);
+
   ASSERT_TRUE(graph.AddConsumer(node1->id, graph_input->id).ok());
   ASSERT_TRUE(graph.SetProducer(node1->id, graph_output->id).ok());
   ASSERT_TRUE(graph.AddConsumer(node2->id, graph_input->id).ok());
@@ -383,6 +411,10 @@ TEST(Model, DeleteValue) {
   Value* graph_input = graph.NewValue();
   Value* graph_output = graph.NewValue();
   Value* value = graph.NewValue();
+
+  graph.AddGraphInput(graph_input->id);
+  graph.AddGraphOutput(graph_output->id);
+
   ASSERT_TRUE(graph.AddConsumer(node1->id, graph_input->id).ok());
   ASSERT_TRUE(graph.SetProducer(node1->id, value->id).ok());
   ASSERT_TRUE(graph.AddConsumer(node2->id, value->id).ok());
@@ -425,6 +457,11 @@ TEST(Model, DeleteNode) {
   Value* graph_output = graph.NewValue();
   Value* graph_output2 = graph.NewValue();
   Value* value = graph.NewValue();
+
+  graph.AddGraphInput(graph_input->id);
+  graph.AddGraphOutput(graph_output->id);
+  graph.AddGraphOutput(graph_output2->id);
+
   ASSERT_TRUE(graph.AddConsumer(node1->id, graph_input->id).ok());
   ASSERT_TRUE(graph.SetProducer(node1->id, value->id).ok());
   ASSERT_TRUE(graph.AddConsumer(node2->id, value->id).ok());
@@ -484,6 +521,10 @@ TEST(Model, InsertNodeAfter) {
   Value* graph_input = graph.NewValue();
   Value* graph_output = graph.NewValue();
   Value* value = graph.NewValue();
+
+  graph.AddGraphInput(graph_input->id);
+  graph.AddGraphOutput(graph_output->id);
+
   ASSERT_TRUE(graph.AddConsumer(node1->id, graph_input->id).ok());
   ASSERT_TRUE(graph.SetProducer(node1->id, value->id).ok());
   ASSERT_TRUE(graph.AddConsumer(node2->id, value->id).ok());
